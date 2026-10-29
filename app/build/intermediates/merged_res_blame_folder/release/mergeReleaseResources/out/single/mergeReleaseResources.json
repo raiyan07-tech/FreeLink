@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "com.freelink.app-release-54:/drawable_ic_launcher_background.xml.flat",
+        "source": "com.freelink.app-main-55:/drawable/ic_launcher_background.xml"
+    },
+    {
+        "merged": "com.freelink.app-release-54:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.freelink.app-main-55:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.freelink.app-release-54:/mipmap-anydpi-v26_ic_launcher.xml.flat",
+        "source": "com.freelink.app-main-55:/mipmap-anydpi-v26/ic_launcher.xml"
+    },
+    {
+        "merged": "com.freelink.app-release-54:/mipmap-anydpi-v26_ic_launcher_round.xml.flat",
+        "source": "com.freelink.app-main-55:/mipmap-anydpi-v26/ic_launcher_round.xml"
+    }
+]

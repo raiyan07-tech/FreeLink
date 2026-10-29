@@ -1,0 +1,19 @@
+R_DEF: Internal format may change without notice
+local
+color brand_background
+color brand_emergency
+color brand_primary
+color brand_secondary
+color brand_surface
+color brand_surface_variant
+color brand_text_primary
+color brand_text_secondary
+drawable ic_launcher_background
+drawable ic_launcher_foreground
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+string emergency_call_label
+string emergency_number
+string tagline
+style Theme.FreeLink
