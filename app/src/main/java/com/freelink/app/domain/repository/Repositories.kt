@@ -24,12 +24,14 @@ interface ContactsRepository {
 
 interface MessageRepository {
     fun getMessagesForContact(contactId: String): Flow<List<Message>>
+    fun getMessagesForPeer(peerFlId: String, localFlId: String): Flow<List<Message>>
     fun getAllMessages(): Flow<List<Message>>
     fun getQueuedMessages(): Flow<List<Message>>
     suspend fun insertMessage(message: Message)
     suspend fun updateDeliveryState(messageId: String, state: com.freelink.app.domain.models.DeliveryState, errorMessage: String? = null)
     suspend fun deleteMessage(messageId: String)
     suspend fun clearMessagesForContact(contactId: String)
+    suspend fun clearMessagesForPeer(peerFlId: String, localFlId: String)
     suspend fun purgeExpiredMessages(currentTimeMillis: Long)
 }
 

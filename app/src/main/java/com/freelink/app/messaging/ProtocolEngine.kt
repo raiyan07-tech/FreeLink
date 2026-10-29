@@ -1,7 +1,6 @@
 package com.freelink.app.messaging
 
 import com.freelink.app.identity.IdentityManager
-import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -9,8 +8,12 @@ import java.util.concurrent.ConcurrentHashMap
  */
 class ProtocolEngine {
 
-    // Deduplication cache: stores message UUIDs seen within TTL
-    private val seenMessageIds = Collections.newSetFromMap(ConcurrentHashMap<String, Boolean>())
+    // Deduplication cache: bounded LRU of message UUIDs seen within TTL.
+    // Eldest entries are evicted instead of clearing the whole cache (no replay window).
+    private val seenMessageIds = object : LinkedHashMap<String, Boolean>(16, 0.75f, false) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Boolean>): Boolean =
+            size > DEDUP_CACHE_LIMIT
+    }
 
     // Rate limiter: maps sender FL ID -> list of timestamps
     private val senderRateLimits = ConcurrentHashMap<String, MutableList<Long>>()
@@ -41,7 +44,7 @@ class ProtocolEngine {
         if (isDuplicate(envelope.messageId)) {
             return ValidationResult.Duplicate("Message already processed")
         }
-        if (isRateLimited(envelope.senderFlId, now)) {
+        if (envelope.contentType != "ack" && isRateLimited(envelope.senderFlId, now)) {
             return ValidationResult.RateLimited("Peer rate limit exceeded")
         }
         return ValidationResult.Valid
@@ -51,14 +54,15 @@ class ProtocolEngine {
      * Records a message ID as processed.
      */
     fun markProcessed(messageId: String) {
-        if (seenMessageIds.size > DEDUP_CACHE_LIMIT) {
-            seenMessageIds.clear() // Simple eviction
+        synchronized(seenMessageIds) {
+            seenMessageIds[messageId] = true
         }
-        seenMessageIds.add(messageId)
     }
 
     fun isDuplicate(messageId: String): Boolean {
-        return seenMessageIds.contains(messageId)
+        return synchronized(seenMessageIds) {
+            seenMessageIds.containsKey(messageId)
+        }
     }
 
     private fun isRateLimited(senderFlId: String, now: Long): Boolean {

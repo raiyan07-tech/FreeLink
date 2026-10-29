@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Schedule
@@ -188,6 +189,7 @@ fun DeliveryStateBadge(
         DeliveryState.SENDING -> Triple("Sending...", ElectricBlue, Icons.Default.Schedule)
         DeliveryState.SENT_TO_PEER -> Triple("Sent to peer", ElectricCyan, Icons.Default.Check)
         DeliveryState.ACKNOWLEDGED_BY_PEER -> Triple("Peer Acknowledged", StateSuccess, Icons.Default.Check)
+        DeliveryState.RECEIVED -> Triple("Received", StateSuccess, Icons.Default.DoneAll)
         DeliveryState.FAILED -> Triple("Failed", StateError, Icons.Default.Close)
     }
 

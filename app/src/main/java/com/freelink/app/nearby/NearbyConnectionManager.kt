@@ -12,8 +12,11 @@ import com.freelink.app.identity.IdentityManager
 import com.freelink.app.messaging.CryptoEngine
 import com.freelink.app.messaging.MessageEnvelope
 import com.freelink.app.messaging.ProtocolEngine
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,10 +40,17 @@ class NearbyConnectionManager(
     private val identityManager: IdentityManager,
     private val contactsRepository: ContactsRepository,
     private val messageRepository: MessageRepository,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO)
+    private val scope: CoroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO + CoroutineExceptionHandler { _, throwable ->
+            Log.w("FreeLink", "Nearby background task failed", throwable)
+        }
+    )
 ) : DiscoveryListener, ConnectionListener {
 
     private val protocolEngine = ProtocolEngine()
+
+    // Consent callback for an inbound connection request awaiting user decision.
+    private var pendingConsentDecision: ((Boolean) -> Unit)? = null
 
     private val _uiState = MutableStateFlow(NearbyUiState())
     val uiState: StateFlow<NearbyUiState> = _uiState.asStateFlow()
@@ -101,75 +111,130 @@ class NearbyConnectionManager(
 
     fun respondToConsent(accept: Boolean) {
         val peer = _uiState.value.incomingConsentPeer
+        val decision = pendingConsentDecision
+        pendingConsentDecision = null
         _uiState.value = _uiState.value.copy(incomingConsentPeer = null)
-        if (peer != null) {
-            if (accept) {
+        if (peer == null) return
+        if (accept) {
+            if (decision != null) {
+                // The transport completes the link and reports it via onConnected()
+                decision(true)
+            } else {
                 _uiState.value = _uiState.value.copy(
-                    connectedPeer = peer,
+                    connectedPeer = peer.copy(isConnected = true),
                     statusMessage = "Connected to ${peer.displayName}"
                 )
-            } else {
-                activeTransport.disconnect(peer.id)
-                _uiState.value = _uiState.value.copy(statusMessage = "Connection rejected")
             }
+        } else {
+            decision?.invoke(false)
+            activeTransport.disconnect(peer.id)
+            _uiState.value = _uiState.value.copy(statusMessage = "Connection rejected")
         }
+    }
+
+    fun disconnectPeer() {
+        val peer = _uiState.value.connectedPeer ?: return
+        activeTransport.disconnect(peer.id)
+        _uiState.value = _uiState.value.copy(
+            connectedPeer = null,
+            statusMessage = "Disconnected from ${peer.displayName}"
+        )
     }
 
     fun sendMessage(
         recipientContactId: String,
         recipientFlId: String,
         text: String,
-        targetPeerId: String? = null
+        targetPeerId: String? = null,
+        existingMessageId: String? = null
     ) {
         scope.launch {
             val localFlId = identityManager.getOrCreateFlId()
-            val message = Message(
-                conversationContactId = recipientContactId,
-                senderFlId = localFlId,
-                recipientFlId = recipientFlId,
-                textContent = text,
-                deliveryState = DeliveryState.QUEUED_LOCALLY,
-                transportType = activeTransport.transportType
-            )
-            messageRepository.insertMessage(message)
+
+            // Store against the canonical Room contact (resolved by FL ID) so
+            // outgoing and incoming messages land in the same conversation thread.
+            val conversationId = contactsRepository.getContactByFlId(recipientFlId).firstOrNull()?.id
+                ?: recipientContactId
+
+            val message = if (existingMessageId == null) {
+                val fresh = Message(
+                    conversationContactId = conversationId,
+                    senderFlId = localFlId,
+                    recipientFlId = recipientFlId,
+                    textContent = text,
+                    deliveryState = DeliveryState.QUEUED_LOCALLY,
+                    transportType = activeTransport.transportType
+                )
+                messageRepository.insertMessage(fresh)
+                fresh
+            } else {
+                // Retry reuses the original message row instead of duplicating it.
+                messageRepository.updateDeliveryState(existingMessageId, DeliveryState.SENDING)
+                Message(
+                    id = existingMessageId,
+                    conversationContactId = conversationId,
+                    senderFlId = localFlId,
+                    recipientFlId = recipientFlId,
+                    textContent = text,
+                    deliveryState = DeliveryState.SENDING,
+                    transportType = activeTransport.transportType
+                )
+            }
 
             val peerId = targetPeerId ?: _uiState.value.connectedPeer?.id
             if (peerId == null) {
                 // Remains queued locally until a link is found
+                messageRepository.updateDeliveryState(message.id, DeliveryState.QUEUED_LOCALLY)
                 _uiState.value = _uiState.value.copy(statusMessage = "Message queued locally (no active peer)")
                 return@launch
             }
 
-            // Derive symmetric key and encrypt
-            val symmetricKey = CryptoEngine.deriveKey(recipientFlId + localFlId)
-            val enc = CryptoEngine.encrypt(text, symmetricKey)
+            transmit(message, peerId)
+        }
+    }
 
-            val envelope = MessageEnvelope(
-                messageId = message.id,
-                senderFlId = localFlId,
-                recipientFlId = recipientFlId,
-                payloadLength = text.length,
-                ciphertextBase64 = enc.ciphertextBase64,
-                ivBase64 = enc.ivBase64
-            )
+    private suspend fun transmit(message: Message, peerId: String) {
+        // Canonical symmetric key derivation shared by both sides: sender FL ID + recipient FL ID.
+        val symmetricKey = CryptoEngine.deriveKey(message.senderFlId + message.recipientFlId)
+        val enc = CryptoEngine.encrypt(message.textContent, symmetricKey)
 
-            messageRepository.updateDeliveryState(message.id, DeliveryState.SENDING)
+        val envelope = MessageEnvelope(
+            messageId = message.id,
+            senderFlId = message.senderFlId,
+            recipientFlId = message.recipientFlId,
+            payloadLength = message.textContent.length,
+            ciphertextBase64 = enc.ciphertextBase64,
+            ivBase64 = enc.ivBase64
+        )
 
-            activeTransport.sendPayload(peerId, envelope.toJsonString()) { success, errorMsg ->
-                scope.launch {
-                    if (success) {
-                        messageRepository.updateDeliveryState(message.id, DeliveryState.SENT_TO_PEER)
-                        _uiState.value = _uiState.value.copy(statusMessage = "Message sent to peer, waiting for ACK")
-                    } else {
-                        messageRepository.updateDeliveryState(
-                            message.id,
-                            DeliveryState.FAILED,
-                            errorMsg ?: "Failed to transmit payload"
-                        )
-                        _uiState.value = _uiState.value.copy(statusMessage = "Send failed: $errorMsg")
-                    }
+        messageRepository.updateDeliveryState(message.id, DeliveryState.SENDING)
+
+        activeTransport.sendPayload(peerId, envelope.toJsonString()) { success, errorMsg ->
+            scope.launch {
+                if (success) {
+                    messageRepository.updateDeliveryState(message.id, DeliveryState.SENT_TO_PEER)
+                    _uiState.value = _uiState.value.copy(statusMessage = "Message sent to peer, waiting for ACK")
+                } else {
+                    messageRepository.updateDeliveryState(
+                        message.id,
+                        DeliveryState.FAILED,
+                        errorMsg ?: "Failed to transmit payload"
+                    )
+                    _uiState.value = _uiState.value.copy(statusMessage = "Send failed: $errorMsg")
                 }
             }
+        }
+    }
+
+    // Retransmit messages that were queued while no peer link existed.
+    private fun flushQueuedMessages(peer: PeerDevice) {
+        if (!IdentityManager.isValidFlId(peer.flId)) return
+        scope.launch {
+            val localFlId = identityManager.getOrCreateFlId()
+            val queued = messageRepository.getQueuedMessages().firstOrNull() ?: return@launch
+            queued
+                .filter { it.recipientFlId == peer.flId && it.senderFlId == localFlId }
+                .forEach { transmit(it, peer.id) }
         }
     }
 
@@ -203,7 +268,8 @@ class NearbyConnectionManager(
     // --- ConnectionListener Callbacks ---
 
     override fun onConnectionRequested(peer: PeerDevice, onConsentDecision: (Boolean) -> Unit) {
-        // Explicit consent required before connecting
+        // Explicit consent required before the link is established
+        pendingConsentDecision = onConsentDecision
         _uiState.value = _uiState.value.copy(incomingConsentPeer = peer)
     }
 
@@ -218,6 +284,8 @@ class NearbyConnectionManager(
             connectedPeer = peer.copy(isConnected = true),
             statusMessage = "Connected to ${peer.displayName}"
         )
+        // Push out anything the user queued while offline
+        flushQueuedMessages(peer)
     }
 
     override fun onDisconnected(peerId: String) {
@@ -232,6 +300,11 @@ class NearbyConnectionManager(
     override fun onPayloadReceived(peerId: String, payload: String) {
         scope.launch {
             val envelope = MessageEnvelope.fromJsonString(payload) ?: return@launch
+
+            // Only process (and acknowledge) traffic actually addressed to this device
+            if (envelope.recipientFlId != identityManager.getOrCreateFlId()) {
+                return@launch
+            }
 
             // Validate against protocol rules (dedup, rate-limit, expiry)
             when (val validation = protocolEngine.validateEnvelope(envelope)) {
@@ -306,7 +379,7 @@ class NearbyConnectionManager(
                 textContent = decryptedText,
                 timestamp = envelope.timestamp,
                 expiryTimestamp = envelope.expiryTimestamp,
-                deliveryState = DeliveryState.ACKNOWLEDGED_BY_PEER,
+                deliveryState = DeliveryState.RECEIVED,
                 transportType = activeTransport.transportType
             )
             messageRepository.insertMessage(incomingMessage)

@@ -51,6 +51,18 @@ interface MessageDao {
     @Query("SELECT * FROM messages WHERE conversationContactId = :contactId ORDER BY timestamp ASC")
     fun getMessagesForContact(contactId: String): Flow<List<MessageEntity>>
 
+    @Query(
+        "SELECT * FROM messages WHERE (senderFlId = :peerFlId AND recipientFlId = :localFlId) " +
+            "OR (senderFlId = :localFlId AND recipientFlId = :peerFlId) ORDER BY timestamp ASC"
+    )
+    fun getMessagesForPeer(peerFlId: String, localFlId: String): Flow<List<MessageEntity>>
+
+    @Query(
+        "DELETE FROM messages WHERE (senderFlId = :peerFlId AND recipientFlId = :localFlId) " +
+            "OR (senderFlId = :localFlId AND recipientFlId = :peerFlId)"
+    )
+    suspend fun clearMessagesForPeer(peerFlId: String, localFlId: String)
+
     @Query("SELECT * FROM messages ORDER BY timestamp DESC")
     fun getAllMessages(): Flow<List<MessageEntity>>
 

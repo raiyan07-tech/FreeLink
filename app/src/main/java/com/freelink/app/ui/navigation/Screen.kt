@@ -1,5 +1,7 @@
 package com.freelink.app.ui.navigation
 
+import android.net.Uri
+
 sealed class Screen(val route: String, val title: String) {
     object Onboarding : Screen("onboarding", "Welcome")
     object Home : Screen("home", "FREELINK")
@@ -10,7 +12,7 @@ sealed class Screen(val route: String, val title: String) {
     object Contacts : Screen("contacts", "Contacts")
     object Chat : Screen("chat/{contactId}/{flId}/{name}", "Chat") {
         fun createRoute(contactId: String, flId: String, name: String) =
-            "chat/$contactId/$flId/$name"
+            "chat/${Uri.encode(contactId)}/${Uri.encode(flId)}/${Uri.encode(name)}"
     }
     object Profile : Screen("profile", "My FreeLink ID")
     object Settings : Screen("settings", "Settings & Privacy")

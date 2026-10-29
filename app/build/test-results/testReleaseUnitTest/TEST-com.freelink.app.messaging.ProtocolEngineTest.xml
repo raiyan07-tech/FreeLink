@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.freelink.app.messaging.ProtocolEngineTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-29T13:51:28.008Z" hostname="LAPTOP-THNPHIPH" time="0.007">
+<testsuite name="com.freelink.app.messaging.ProtocolEngineTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-29T14:59:48.434Z" hostname="LAPTOP-THNPHIPH" time="0.009">
   <properties/>
-  <testcase name="validEnvelope_passesValidation" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.004"/>
-  <testcase name="expiredEnvelope_isRejected" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.001"/>
+  <testcase name="validEnvelope_passesValidation" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.006"/>
+  <testcase name="expiredEnvelope_isRejected" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.0"/>
   <testcase name="oversizedPayload_isRejected" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.001"/>
-  <testcase name="duplicateEnvelope_isDetectedAndSuppressed" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.0"/>
-  <testcase name="envelopeJsonSerializationRoundTrip" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.001"/>
-  <testcase name="invalidSenderId_isRejected" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.0"/>
+  <testcase name="duplicateEnvelope_isDetectedAndSuppressed" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.001"/>
+  <testcase name="envelopeJsonSerializationRoundTrip" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.0"/>
+  <testcase name="invalidSenderId_isRejected" classname="com.freelink.app.messaging.ProtocolEngineTest" time="0.001"/>
   <system-out><![CDATA[]]></system-out>
   <system-err><![CDATA[]]></system-err>
 </testsuite>

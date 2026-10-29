@@ -33,6 +33,8 @@ public final class MessageDao_Impl implements MessageDao {
 
   private final EntityInsertionAdapter<MessageEntity> __insertionAdapterOfMessageEntity;
 
+  private final SharedSQLiteStatement __preparedStmtOfClearMessagesForPeer;
+
   private final SharedSQLiteStatement __preparedStmtOfUpdateDeliveryState;
 
   private final SharedSQLiteStatement __preparedStmtOfDeleteMessage;
@@ -68,6 +70,14 @@ public final class MessageDao_Impl implements MessageDao {
         } else {
           statement.bindString(11, entity.getErrorMessage());
         }
+      }
+    };
+    this.__preparedStmtOfClearMessagesForPeer = new SharedSQLiteStatement(__db) {
+      @Override
+      @NonNull
+      public String createQuery() {
+        final String _query = "DELETE FROM messages WHERE (senderFlId = ? AND recipientFlId = ?) OR (senderFlId = ? AND recipientFlId = ?)";
+        return _query;
       }
     };
     this.__preparedStmtOfUpdateDeliveryState = new SharedSQLiteStatement(__db) {
@@ -118,6 +128,38 @@ public final class MessageDao_Impl implements MessageDao {
           return Unit.INSTANCE;
         } finally {
           __db.endTransaction();
+        }
+      }
+    }, $completion);
+  }
+
+  @Override
+  public Object clearMessagesForPeer(final String peerFlId, final String localFlId,
+      final Continuation<? super Unit> $completion) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      @NonNull
+      public Unit call() throws Exception {
+        final SupportSQLiteStatement _stmt = __preparedStmtOfClearMessagesForPeer.acquire();
+        int _argIndex = 1;
+        _stmt.bindString(_argIndex, peerFlId);
+        _argIndex = 2;
+        _stmt.bindString(_argIndex, localFlId);
+        _argIndex = 3;
+        _stmt.bindString(_argIndex, localFlId);
+        _argIndex = 4;
+        _stmt.bindString(_argIndex, peerFlId);
+        try {
+          __db.beginTransaction();
+          try {
+            _stmt.executeUpdateDelete();
+            __db.setTransactionSuccessful();
+            return Unit.INSTANCE;
+          } finally {
+            __db.endTransaction();
+          }
+        } finally {
+          __preparedStmtOfClearMessagesForPeer.release(_stmt);
         }
       }
     }, $completion);
@@ -241,6 +283,81 @@ public final class MessageDao_Impl implements MessageDao {
     final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 1);
     int _argIndex = 1;
     _statement.bindString(_argIndex, contactId);
+    return CoroutinesRoom.createFlow(__db, false, new String[] {"messages"}, new Callable<List<MessageEntity>>() {
+      @Override
+      @NonNull
+      public List<MessageEntity> call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfConversationContactId = CursorUtil.getColumnIndexOrThrow(_cursor, "conversationContactId");
+          final int _cursorIndexOfSenderFlId = CursorUtil.getColumnIndexOrThrow(_cursor, "senderFlId");
+          final int _cursorIndexOfRecipientFlId = CursorUtil.getColumnIndexOrThrow(_cursor, "recipientFlId");
+          final int _cursorIndexOfTextContent = CursorUtil.getColumnIndexOrThrow(_cursor, "textContent");
+          final int _cursorIndexOfTimestamp = CursorUtil.getColumnIndexOrThrow(_cursor, "timestamp");
+          final int _cursorIndexOfExpiryTimestamp = CursorUtil.getColumnIndexOrThrow(_cursor, "expiryTimestamp");
+          final int _cursorIndexOfDeliveryState = CursorUtil.getColumnIndexOrThrow(_cursor, "deliveryState");
+          final int _cursorIndexOfTransportType = CursorUtil.getColumnIndexOrThrow(_cursor, "transportType");
+          final int _cursorIndexOfRetryCount = CursorUtil.getColumnIndexOrThrow(_cursor, "retryCount");
+          final int _cursorIndexOfErrorMessage = CursorUtil.getColumnIndexOrThrow(_cursor, "errorMessage");
+          final List<MessageEntity> _result = new ArrayList<MessageEntity>(_cursor.getCount());
+          while (_cursor.moveToNext()) {
+            final MessageEntity _item;
+            final String _tmpId;
+            _tmpId = _cursor.getString(_cursorIndexOfId);
+            final String _tmpConversationContactId;
+            _tmpConversationContactId = _cursor.getString(_cursorIndexOfConversationContactId);
+            final String _tmpSenderFlId;
+            _tmpSenderFlId = _cursor.getString(_cursorIndexOfSenderFlId);
+            final String _tmpRecipientFlId;
+            _tmpRecipientFlId = _cursor.getString(_cursorIndexOfRecipientFlId);
+            final String _tmpTextContent;
+            _tmpTextContent = _cursor.getString(_cursorIndexOfTextContent);
+            final long _tmpTimestamp;
+            _tmpTimestamp = _cursor.getLong(_cursorIndexOfTimestamp);
+            final long _tmpExpiryTimestamp;
+            _tmpExpiryTimestamp = _cursor.getLong(_cursorIndexOfExpiryTimestamp);
+            final String _tmpDeliveryState;
+            _tmpDeliveryState = _cursor.getString(_cursorIndexOfDeliveryState);
+            final String _tmpTransportType;
+            _tmpTransportType = _cursor.getString(_cursorIndexOfTransportType);
+            final int _tmpRetryCount;
+            _tmpRetryCount = _cursor.getInt(_cursorIndexOfRetryCount);
+            final String _tmpErrorMessage;
+            if (_cursor.isNull(_cursorIndexOfErrorMessage)) {
+              _tmpErrorMessage = null;
+            } else {
+              _tmpErrorMessage = _cursor.getString(_cursorIndexOfErrorMessage);
+            }
+            _item = new MessageEntity(_tmpId,_tmpConversationContactId,_tmpSenderFlId,_tmpRecipientFlId,_tmpTextContent,_tmpTimestamp,_tmpExpiryTimestamp,_tmpDeliveryState,_tmpTransportType,_tmpRetryCount,_tmpErrorMessage);
+            _result.add(_item);
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+        }
+      }
+
+      @Override
+      protected void finalize() {
+        _statement.release();
+      }
+    });
+  }
+
+  @Override
+  public Flow<List<MessageEntity>> getMessagesForPeer(final String peerFlId,
+      final String localFlId) {
+    final String _sql = "SELECT * FROM messages WHERE (senderFlId = ? AND recipientFlId = ?) OR (senderFlId = ? AND recipientFlId = ?) ORDER BY timestamp ASC";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 4);
+    int _argIndex = 1;
+    _statement.bindString(_argIndex, peerFlId);
+    _argIndex = 2;
+    _statement.bindString(_argIndex, localFlId);
+    _argIndex = 3;
+    _statement.bindString(_argIndex, localFlId);
+    _argIndex = 4;
+    _statement.bindString(_argIndex, peerFlId);
     return CoroutinesRoom.createFlow(__db, false, new String[] {"messages"}, new Callable<List<MessageEntity>>() {
       @Override
       @NonNull

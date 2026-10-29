@@ -81,7 +81,9 @@ fun ChatScreen(
     onBack: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val messages by messageRepository.getMessagesForContact(contactId).collectAsState(initial = emptyList())
+    // Load by FL ID pair so messages are shown regardless of which entry point
+    // (Nearby, Contacts, Home banner) opened the chat or how rows were keyed.
+    val messages by messageRepository.getMessagesForPeer(peerFlId, localFlId).collectAsState(initial = emptyList())
     val nearbyState by nearbyManager.uiState.collectAsState()
 
     var inputText by remember { mutableStateOf("") }
@@ -140,7 +142,7 @@ fun ChatScreen(
                 IconButton(
                     onClick = {
                         scope.launch {
-                            messageRepository.clearMessagesForContact(contactId)
+                            messageRepository.clearMessagesForPeer(peerFlId, localFlId)
                         }
                     }
                 ) {
@@ -190,7 +192,8 @@ fun ChatScreen(
                         nearbyManager.sendMessage(
                             recipientContactId = contactId,
                             recipientFlId = peerFlId,
-                            text = message.textContent
+                            text = message.textContent,
+                            existingMessageId = message.id
                         )
                     }
                 )

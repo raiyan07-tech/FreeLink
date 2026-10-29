@@ -3,9 +3,12 @@ package com.freelink.app.nearby
 import com.freelink.app.domain.models.PeerDevice
 import com.freelink.app.domain.models.TransportType
 import com.freelink.app.messaging.MessageEnvelope
+import android.util.Log
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
@@ -18,7 +21,11 @@ import java.util.concurrent.ConcurrentHashMap
 class SimulationTransport : NearbyTransport {
 
     override val transportType: TransportType = TransportType.LOCAL_DEMO_SIMULATION
-    private val scope = CoroutineScope(Dispatchers.Default + Job())
+    private val scope = CoroutineScope(
+        SupervisorJob() + Dispatchers.Default + CoroutineExceptionHandler { _, throwable ->
+            Log.w("FreeLink", "Simulation transport error", throwable)
+        }
+    )
 
     private var discoveryListener: DiscoveryListener? = null
     private var connectionListener: ConnectionListener? = null
@@ -82,8 +89,15 @@ class SimulationTransport : NearbyTransport {
         this.connectionListener = listener
         scope.launch {
             delay(600) // Connection negotiation
-            connectedPeers[peer.id] = peer
-            listener.onConnected(peer.id)
+            // Peer consent must be granted before the simulated link is established
+            listener.onConnectionRequested(peer) { accepted ->
+                if (accepted) {
+                    connectedPeers[peer.id] = peer
+                    listener.onConnected(peer.id)
+                } else {
+                    listener.onDisconnected(peer.id)
+                }
+            }
         }
     }
 
@@ -121,7 +135,7 @@ class SimulationTransport : NearbyTransport {
                     senderFlId = envelope.recipientFlId,
                     recipientFlId = envelope.senderFlId,
                     contentType = "text/plain",
-                    payloadLength = 38,
+                    payloadLength = "I received your message offline safely!".length,
                     ciphertextBase64 = "I received your message offline safely!",
                     ivBase64 = ""
                 )

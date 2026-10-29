@@ -299,7 +299,7 @@ fun NearbyScreen(
                         IconButton(onClick = { onOpenChat(peer.id, peer.flId, peer.displayName) }) {
                             Icon(imageVector = Icons.Default.Chat, contentDescription = "Open Chat", tint = ElectricCyan)
                         }
-                        IconButton(onClick = { nearbyManager.respondToConsent(false) }) {
+                        IconButton(onClick = { nearbyManager.disconnectPeer() }) {
                             Icon(imageVector = Icons.Default.LinkOff, contentDescription = "Disconnect", tint = EmergencyRed)
                         }
                     }

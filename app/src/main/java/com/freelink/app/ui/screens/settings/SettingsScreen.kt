@@ -80,7 +80,8 @@ fun SettingsScreen(
     val scrollState = rememberScrollState()
 
     val nearbyState by nearbyManager.uiState.collectAsState()
-    var isDiscoverable by remember { mutableStateOf(true) }
+    // Reflect the real radio state instead of a desynchronized local flag
+    val isDiscoverable = nearbyState.isAdvertising
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     if (showDeleteConfirmDialog) {
@@ -179,7 +180,6 @@ fun SettingsScreen(
                     Switch(
                         checked = isDiscoverable,
                         onCheckedChange = {
-                            isDiscoverable = it
                             if (it) nearbyManager.startAdvertising()
                             else nearbyManager.stopAdvertising()
                         },

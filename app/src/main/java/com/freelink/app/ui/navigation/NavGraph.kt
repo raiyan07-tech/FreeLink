@@ -1,6 +1,7 @@
 package com.freelink.app.ui.navigation
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -27,6 +28,13 @@ import com.freelink.app.ui.screens.profile.ProfileScreen
 import com.freelink.app.ui.screens.reconnect.ReconnectScreen
 import com.freelink.app.ui.screens.settings.SettingsScreen
 import com.freelink.app.ui.screens.travelkit.TravelKitScreen
+
+private val PERCENT_ENCODED = Regex("%[0-9A-Fa-f]{2}")
+
+// Route arguments are percent-encoded by Screen.createRoute. Decode them if the
+// navigation runtime handed them back still encoded (safe no-op otherwise).
+private fun decodeRouteArg(value: String): String =
+    if (PERCENT_ENCODED.containsMatchIn(value)) Uri.decode(value) else value
 
 @Composable
 fun FreeLinkNavGraph(
@@ -126,9 +134,9 @@ fun FreeLinkNavGraph(
                 navArgument("name") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val contactId = backStackEntry.arguments?.getString("contactId") ?: ""
-            val flId = backStackEntry.arguments?.getString("flId") ?: ""
-            val name = backStackEntry.arguments?.getString("name") ?: "Contact"
+            val contactId = backStackEntry.arguments?.getString("contactId")?.let(::decodeRouteArg) ?: ""
+            val flId = backStackEntry.arguments?.getString("flId")?.let(::decodeRouteArg) ?: ""
+            val name = backStackEntry.arguments?.getString("name")?.let(::decodeRouteArg) ?: "Contact"
 
             ChatScreen(
                 contactId = contactId,

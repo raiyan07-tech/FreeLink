@@ -65,6 +65,9 @@ class RoomMessageRepository(private val dao: MessageDao) : MessageRepository {
     override fun getMessagesForContact(contactId: String): Flow<List<Message>> =
         dao.getMessagesForContact(contactId).map { list -> list.map { it.toDomain() } }
 
+    override fun getMessagesForPeer(peerFlId: String, localFlId: String): Flow<List<Message>> =
+        dao.getMessagesForPeer(peerFlId, localFlId).map { list -> list.map { it.toDomain() } }
+
     override fun getAllMessages(): Flow<List<Message>> =
         dao.getAllMessages().map { list -> list.map { it.toDomain() } }
 
@@ -89,6 +92,10 @@ class RoomMessageRepository(private val dao: MessageDao) : MessageRepository {
 
     override suspend fun clearMessagesForContact(contactId: String) {
         dao.clearMessagesForContact(contactId)
+    }
+
+    override suspend fun clearMessagesForPeer(peerFlId: String, localFlId: String) {
+        dao.clearMessagesForPeer(peerFlId, localFlId)
     }
 
     override suspend fun purgeExpiredMessages(currentTimeMillis: Long) {

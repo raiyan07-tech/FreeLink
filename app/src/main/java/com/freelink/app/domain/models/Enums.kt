@@ -9,6 +9,7 @@ enum class DeliveryState {
     SENDING,
     SENT_TO_PEER,
     ACKNOWLEDGED_BY_PEER,
+    RECEIVED,
     FAILED
 }
 
